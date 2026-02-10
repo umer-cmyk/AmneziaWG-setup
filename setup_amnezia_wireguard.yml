@@ -1,0 +1,247 @@
+---
+- name: Setup AmneziaWG Server per Documentation
+  hosts: wireguard_servers
+  become: true
+  vars:
+    # Subnet Configuration (Matches guide's step 3)
+    vpn_network: "10.100.0.1/16"
+    vpn_subnet_cidr: "10.100.0.0/16"
+    
+    # Paths defined in the guide
+    awg_dir: "/etc/amnezia/amneziawg"
+    scripts_dir: "/etc/amnezia/amneziawg/scripts"
+    api_dir: "/etc/amnezia/amneziawg/vpn_api"
+
+  tasks:
+    # --- 1. System & Prerequisites ---
+    - name: Update apt cache and upgrade packages
+      apt:
+        update_cache: yes
+        upgrade: yes
+
+    - name: Add AmneziaWG PPA Repository
+      shell: "add-apt-repository ppa:amnezia/ppa -y && apt update"
+      args:
+        creates: /etc/apt/sources.list.d/amnezia-ubuntu-ppa-jammy.list
+
+    - name: Install AmneziaWG and Core Dependencies
+      apt:
+        name:
+          - amneziawg
+          - curl
+          - build-essential
+        state: present
+
+    # Note: Installing Node via apt is more stable for servers than NVM
+    # This installs the latest 18.x or 20.x LTS from NodeSource to match "fresh" requirements
+    - name: Setup NodeSource Repository (LTS)
+      shell: "curl -fsSL https://deb.nodesource.com/setup_20.x | bash -"
+      args:
+        creates: /etc/apt/sources.list.d/nodesource.list
+
+    - name: Install Node.js and NPM
+      apt:
+        name: nodejs
+        state: present
+
+    # --- 2. Key Generation & Stealth Parameters ---
+    - name: Check if private key exists
+      stat:
+        path: "{{ awg_dir }}/privatekey"
+      register: private_key_file
+
+    - name: Generate AmneziaWG Identity
+      shell: |
+        umask 077
+        awg genkey | tee privatekey | awg pubkey > publickey
+      args:
+        chdir: "{{ awg_dir }}"
+      when: not private_key_file.stat.exists
+
+    - name: Generate Stealth Magic Parameters
+      shell: |
+        cat > magic_params << 'EOF'
+        Jc = $(shuf -i 3-10 -n 1)
+        Jmin = $(shuf -i 10-50 -n 1)
+        Jmax = $(shuf -i 50-100 -n 1)
+        S1 = $(shuf -i 15-150 -n 1)
+        S2 = $(shuf -i 15-150 -n 1)
+        H1 = $(shuf -i 100000000-999999999 -n 1)
+        H2 = $(shuf -i 100000000-999999999 -n 1)
+        H3 = $(shuf -i 100000000-999999999 -n 1)
+        H4 = $(shuf -i 100000000-999999999 -n 1)
+        EOF
+      args:
+        chdir: "{{ awg_dir }}"
+      when: not private_key_file.stat.exists
+
+    - name: Execute Magic Parameters Script
+      shell: |
+        bash -c "
+        echo 'Jc = '$(shuf -i 3-10 -n 1) > magic_params
+        echo 'Jmin = '$(shuf -i 10-50 -n 1) >> magic_params
+        echo 'Jmax = '$(shuf -i 50-100 -n 1) >> magic_params
+        echo 'S1 = '$(shuf -i 15-150 -n 1) >> magic_params
+        echo 'S2 = '$(shuf -i 15-150 -n 1) >> magic_params
+        echo 'H1 = '$(shuf -i 100000000-999999999 -n 1) >> magic_params
+        echo 'H2 = '$(shuf -i 100000000-999999999 -n 1) >> magic_params
+        echo 'H3 = '$(shuf -i 100000000-999999999 -n 1) >> magic_params
+        echo 'H4 = '$(shuf -i 100000000-999999999 -n 1) >> magic_params
+        "
+      args:
+        chdir: "{{ awg_dir }}"
+      when: not private_key_file.stat.exists
+
+    - name: Read Private Key
+      slurp:
+        src: "{{ awg_dir }}/privatekey"
+      register: private_key_content
+
+    - name: Read Magic Parameters
+      slurp:
+        src: "{{ awg_dir }}/magic_params"
+      register: magic_params_content
+
+    # --- 3. Server Configuration (Step 3 & 4) ---
+    - name: Ensure AmneziaWG config directory exists
+      file:
+        path: "{{ awg_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Enable IPv4 IP Forwarding
+      sysctl:
+        name: net.ipv4.ip_forward
+        value: '1'
+        sysctl_set: yes
+        state: present
+        reload: yes
+
+    - name: Create awg0.conf with Stealth Parameters
+      copy:
+        dest: "{{ awg_dir }}/awg0.conf"
+        mode: '0600'
+        content: |
+          [Interface]
+          Address = {{ vpn_network }}
+          ListenPort = 51820
+          PrivateKey = {{ private_key_content['content'] | b64decode | trim }}
+          
+          # --- AMNEZIA STEALTH PARAMETERS ---
+          {{ magic_params_content['content'] | b64decode }}
+          # -------------------------------------------
+          
+          SaveConfig = true
+          
+          PostUp = ufw route allow in on awg0 out on {{ ansible_default_ipv4.interface }}
+          PostUp = iptables -t nat -I POSTROUTING -o {{ ansible_default_ipv4.interface }} -s {{ vpn_subnet_cidr }} -j MASQUERADE
+          PreDown = iptables -t nat -D POSTROUTING -o {{ ansible_default_ipv4.interface }} -s {{ vpn_subnet_cidr }} -j MASQUERADE
+          PostDown = ufw route delete allow in on awg0 out on {{ ansible_default_ipv4.interface }}
+
+    - name: Start and Enable AmneziaWG Service
+      service:
+        name: awg-quick@awg0
+        state: started
+        enabled: yes
+        
+    # --- 4. Firewall (Step 5) ---
+    - name: Configure UFW for SSH, AmneziaWG, and API
+      ufw:
+        rule: allow
+        port: "{{ item.port }}"
+        proto: "{{ item.proto }}"
+      loop:
+        - { port: '22', proto: 'tcp' }    # OpenSSH
+        - { port: '51820', proto: 'udp' } # AmneziaWG
+        - { port: '9008', proto: 'tcp' }  # API
+
+    - name: Enable UFW
+      ufw:
+        state: enabled
+
+    # --- 5. Automation Scripts (Step 7) ---
+    - name: Create Scripts Directory
+      file:
+        path: "{{ scripts_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Copy Automation Scripts
+      copy:
+        src: "scripts/{{ item }}"
+        dest: "{{ scripts_dir }}/{{ item }}"
+        mode: '0755'
+      loop:
+        - next_available_ip.sh
+        - add_peer.sh
+        - cleanup_inactive.sh
+        - awg_stats_to_api.py
+
+    - name: Setup Cron Job for Cleanup (every 5 minutes)
+      cron:
+        name: "Cleanup Inactive AmneziaWG Peers"
+        minute: "*/5"
+        job: "{{ scripts_dir }}/cleanup_inactive.sh >> /var/log/cleanup_inactive.log 2>&1"
+
+    - name: Setup Cron Job for AmneziaWG Stats API (every 3 minutes)
+      cron:
+        name: "AmneziaWG Stats to API"
+        minute: "*/3"
+        job: "{{ scripts_dir }}/awg_stats_to_api.py >> /var/log/wg_stats_api.log 2>&1"
+
+    # --- 6. API Setup (Step 8) ---
+    - name: Create API Directory
+      file:
+        path: "{{ api_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Copy Server.js
+      copy:
+        src: "api/server.js"
+        dest: "{{ api_dir }}/server.js"
+
+    - name: Initialize NPM and Install Dependencies
+      shell: |
+        if [ ! -f package.json ]; then npm init -y; fi
+        npm install express async-lock
+      args:
+        chdir: "{{ api_dir }}"
+      register: npm_install
+      changed_when: "'added' in npm_install.stdout"
+
+    - name: Install PM2 Globally
+      npm:
+        name: pm2
+        global: yes
+
+    - name: Configure Sudoers for API (add_peer.sh)
+      lineinfile:
+        path: /etc/sudoers
+        state: present
+        line: 'root ALL=(ALL) NOPASSWD: {{ scripts_dir }}/add_peer.sh'
+        validate: 'visudo -cf %s'
+
+    # Start the API with PM2
+    - name: Start API with PM2
+      shell: |
+        pm2 start server.js --name vpn_api || pm2 restart vpn_api
+        pm2 save
+      args:
+        chdir: "{{ api_dir }}"
+      environment:
+        PATH: "/usr/bin:/bin:/usr/local/bin"
+
+    # Enable PM2 Startup System for persistence on reboot
+    - name: Enable PM2 Startup System
+      shell: pm2 startup systemd -u root --hp /root
+      environment:
+        PATH: "/usr/bin:/bin:/usr/local/bin"
+      ignore_errors: yes  # Prevents failure if already enabled
+
+  handlers:
+    - name: Restart AmneziaWG
+      service:
+        name: awg-quick@awg0
+        state: restarted
+        enabled: yes
