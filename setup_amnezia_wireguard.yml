@@ -188,6 +188,7 @@
         - add_peer.sh
         - cleanup_inactive.sh
         - awg_stats_to_api.py
+        - create_stealth_client.sh
 
     - name: Setup Cron Job for Cleanup (every 5 minutes)
       cron:
