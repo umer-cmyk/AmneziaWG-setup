@@ -1,6 +1,6 @@
 ---
 - name: Setup AmneziaWG Server per Documentation
-  hosts: wireguard_servers
+  hosts: new_Awireguard_servers
   become: true
   vars:
     # Subnet Configuration (Matches guide's step 3)
@@ -92,6 +92,13 @@
         chdir: "{{ awg_dir }}"
       when: not private_key_file.stat.exists
 
+    - name: Generate Random Listen Port
+      shell: |
+        shuf -i 10001-65535 -n 1 > listen_port
+      args:
+        chdir: "{{ awg_dir }}"
+      when: not private_key_file.stat.exists
+
     - name: Read Private Key
       slurp:
         src: "{{ awg_dir }}/privatekey"
@@ -101,6 +108,11 @@
       slurp:
         src: "{{ awg_dir }}/magic_params"
       register: magic_params_content
+
+    - name: Read Listen Port
+      slurp:
+        src: "{{ awg_dir }}/listen_port"
+      register: listen_port_content
 
     # --- 3. Server Configuration (Step 3 & 4) ---
     - name: Ensure AmneziaWG config directory exists
@@ -124,7 +136,7 @@
         content: |
           [Interface]
           Address = {{ vpn_network }}
-          ListenPort = 51820
+          ListenPort = {{ listen_port_content['content'] | b64decode | trim }}
           PrivateKey = {{ private_key_content['content'] | b64decode | trim }}
           
           # --- AMNEZIA STEALTH PARAMETERS ---
@@ -152,7 +164,7 @@
         proto: "{{ item.proto }}"
       loop:
         - { port: '22', proto: 'tcp' }    # OpenSSH
-        - { port: '51820', proto: 'udp' } # AmneziaWG
+        - { port: "{{ listen_port_content['content'] | b64decode | trim }}", proto: 'udp' } # AmneziaWG
         - { port: '9008', proto: 'tcp' }  # API
 
     - name: Enable UFW
