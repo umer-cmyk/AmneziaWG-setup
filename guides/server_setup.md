@@ -134,7 +134,7 @@ Recommended scripts (provided in this repository):
 Schedule the cleanup script every 5 minutes and the stats script every 3 minutes using cron. Edit the root crontab (`sudo crontab -e`) and add:
 
 ```cron
-*/5 * * * * /etc/amnezia/amneziawg/scripts/cleanup_inactive.sh >> /var/log/cleanup_inactive.log 2>&1
+*/3 * * * * /etc/amnezia/amneziawg/scripts/cleanup_inactive.sh >> /var/log/cleanup_inactive.log 2>&1
 */3 * * * * /etc/amnezia/amneziawg/scripts/wg_stats_to_api.py >> /var/log/wg_stats_to_api.log 2>&1
 ```
 

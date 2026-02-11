@@ -2,9 +2,8 @@
 
 # Configuration
 INTERFACE="awg0"
-HOURS=2
-# Convert hours to seconds
-LIMIT_SECONDS=$((HOURS * 3600))
+MINUTES=10
+LIMIT_SECONDS=$((MINUTES * 60))
 CURRENT_TIME=$(date +%s)
 
 echo "Starting cleanup on interface $INTERFACE..."

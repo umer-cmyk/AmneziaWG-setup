@@ -193,7 +193,7 @@
     - name: Setup Cron Job for Cleanup (every 5 minutes)
       cron:
         name: "Cleanup Inactive AmneziaWG Peers"
-        minute: "*/5"
+        minute: "*/3"
         job: "{{ scripts_dir }}/cleanup_inactive.sh >> /var/log/cleanup_inactive.log 2>&1"
 
     - name: Setup Cron Job for AmneziaWG Stats API (every 3 minutes)
