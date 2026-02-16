@@ -37,14 +37,24 @@
       args:
         creates: /etc/apt/sources.list.d/amnezia-ubuntu-ppa-jammy.list
 
-    - name: Install AmneziaWG and Core Dependencies
-      apt:
-        name:
-          - amneziawg
-          - curl
-          - build-essential
-          - python3-requests
-        state: present
+    - name: Clear package locks and attempt dpkg repair
+      shell: |
+        rm -f /var/lib/apt/lists/lock
+        rm -f /var/cache/apt/archives/lock
+        rm -f /var/lib/dpkg/lock*
+        dpkg --configure -a || true
+        apt-get install -f -y || true
+      ignore_errors: yes
+
+    - name: Install core build tools first
+      shell: "apt-get install -y --no-install-recommends curl build-essential python3-requests"
+      retries: 3
+      delay: 15
+
+    - name: Install AmneziaWG
+      shell: "apt-get install -y amneziawg"
+      retries: 3
+      delay: 15
 
     # Note: Installing Node via apt is more stable for servers than NVM
     # This installs the latest 18.x or 20.x LTS from NodeSource to match "fresh" requirements
@@ -53,10 +63,10 @@
       args:
         creates: /etc/apt/sources.list.d/nodesource.list
 
-    - name: Install Node.js and NPM
-      apt:
-        name: nodejs
-        state: present
+    - name: Install Node.js and NPM with retries
+      shell: "apt-get install -y --no-install-recommends nodejs"
+      retries: 3
+      delay: 15
 
     # --- 2. Key Generation & Stealth Parameters ---
     - name: Check if private key exists
