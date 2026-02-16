@@ -20,24 +20,36 @@
         cache_valid_time: 3600
       ignore_errors: yes
 
-    - name: Install kernel headers (required for DKMS)
-      shell: "apt-get install -y --no-install-recommends linux-headers-generic"
-      retries: 3
-      delay: 10
+    - name: Get current running kernel version
+      shell: "uname -r"
+      register: running_kernel
+      changed_when: false
 
-    - name: Remove broken amneziawg packages
+    - name: Remove old kernel packages (keep only running kernel)
       shell: |
-        apt-get remove -y amneziawg amneziawg-dkms || true
+        apt-get remove -y $(dpkg -l | grep linux-image | awk '{print $2}' | grep -v $(uname -r) | grep -v linux-image-generic) || true
+        apt-get remove -y $(dpkg -l | grep linux-headers | awk '{print $2}' | grep -v $(uname -r) | grep -v linux-headers-generic) || true
       ignore_errors: yes
 
-    - name: Clean DKMS state
+    - name: Clean DKMS state from failed builds
       shell: |
         rm -rf /var/lib/dkms/amneziawg* || true
       ignore_errors: yes
 
-    - name: Fix broken packages
-      shell: "apt-get install -f -y"
+    - name: Remove broken amneziawg packages
+      shell: "apt-get remove -y amneziawg amneziawg-dkms || true"
       ignore_errors: yes
+
+    - name: Fix broken package dependencies
+      shell: "apt-get install -f -y"
+      retries: 2
+      delay: 5
+      ignore_errors: yes
+
+    - name: Install headers for running kernel
+      shell: "apt-get install -y --no-install-recommends linux-headers-{{ running_kernel.stdout }}"
+      retries: 3
+      delay: 10
 
     - name: Add AmneziaWG PPA Repository
       shell: "add-apt-repository ppa:amnezia/ppa -y && apt update"
@@ -45,18 +57,17 @@
         creates: /etc/apt/sources.list.d/amnezia-ubuntu-ppa-jammy.list
       ignore_errors: yes
 
-    - name: Install core build tools and utilities
-      shell: "apt-get install -y --no-install-recommends curl build-essential python3-requests"
+    - name: Install build dependencies and utilities
+      shell: "apt-get install -y --no-install-recommends build-essential dkms curl python3-requests"
       retries: 3
       delay: 10
 
-    - name: Install AmneziaWG (now with headers available)
+    - name: Install AmneziaWG (with clean DKMS state)
       shell: "apt-get install -y amneziawg"
       retries: 3
       delay: 15
       register: awg_install
       until: awg_install is succeeded
-      ignore_errors: yes
 
     # Note: Installing Node via apt is more stable for servers than NVM
     # This installs the latest 18.x or 20.x LTS from NodeSource to match "fresh" requirements
