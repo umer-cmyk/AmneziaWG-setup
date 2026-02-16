@@ -14,83 +14,24 @@
 
   tasks:
     # --- 1. System & Prerequisites ---
-    - name: Update apt cache
+    - name: Update apt cache and upgrade packages
       apt:
         update_cache: yes
-        cache_valid_time: 3600
-      ignore_errors: yes
-
-    - name: Get current running kernel version
-      shell: "uname -r"
-      register: running_kernel
-      changed_when: false
-
-    - name: Remove old kernel packages (keep only running kernel)
-      shell: |
-        apt-get remove -y $(dpkg -l | grep linux-image | awk '{print $2}' | grep -v $(uname -r) | grep -v linux-image-generic) || true
-        apt-get remove -y $(dpkg -l | grep linux-headers | awk '{print $2}' | grep -v $(uname -r) | grep -v linux-headers-generic) || true
-      ignore_errors: yes
-
-    - name: Clean DKMS state from failed builds
-      shell: |
-        rm -rf /var/lib/dkms/amneziawg* || true
-      ignore_errors: yes
-
-    - name: Remove broken amneziawg packages
-      shell: "apt-get remove -y amneziawg amneziawg-dkms || true"
-      ignore_errors: yes
-
-    - name: Fix broken package dependencies
-      shell: "apt-get install -f -y"
-      retries: 2
-      delay: 5
-      ignore_errors: yes
-
-    - name: Install headers for running kernel
-      shell: "apt-get install -y --no-install-recommends linux-headers-{{ running_kernel.stdout }}"
-      retries: 3
-      delay: 10
+        upgrade: yes
 
     - name: Add AmneziaWG PPA Repository
       shell: "add-apt-repository ppa:amnezia/ppa -y && apt update"
       args:
         creates: /etc/apt/sources.list.d/amnezia-ubuntu-ppa-jammy.list
-      ignore_errors: yes
 
-    - name: Install build dependencies and utilities
-      shell: "apt-get install -y --no-install-recommends build-essential dkms curl python3-requests"
-      retries: 3
-      delay: 10
-
-    - name: Remove old kernel entries from DKMS
-      shell: |
-        # Find and remove any DKMS entries for old kernels
-        for kernel in $(dkms status | grep amneziawg | grep -v "$(uname -r)" | awk '{print $3}' | cut -d',' -f1 | sort -u); do
-          dkms remove amneziawg/1.0.0 -k "$kernel" || true
-        done
-      ignore_errors: yes
-
-    - name: Clean up old kernel packages
-      shell: "apt-get autoremove -y"
-      ignore_errors: yes
-
-    - name: Wait for any dpkg locks to clear
-      shell: |
-        for i in {1..30}; do
-          if ! fuser /var/lib/dpkg/lock-frontend 2>/dev/null; then
-            exit 0
-          fi
-          sleep 1
-        done
-        echo "Timeout waiting for dpkg lock"
-        exit 1
-      ignore_errors: yes
-
-    - name: Install AmneziaWG (with clean DKMS state)
-      shell: "apt-get install -y amneziawg"
-      retries: 3
-      delay: 15
-      register: awg_install
+    - name: Install AmneziaWG and Core Dependencies
+      apt:
+        name:
+          - amneziawg
+          - curl
+          - build-essential
+          - python3-requests
+        state: present
 
     # Note: Installing Node via apt is more stable for servers than NVM
     # This installs the latest 18.x or 20.x LTS from NodeSource to match "fresh" requirements
@@ -99,10 +40,10 @@
       args:
         creates: /etc/apt/sources.list.d/nodesource.list
 
-    - name: Install Node.js and NPM with retries
-      shell: "apt-get install -y --no-install-recommends nodejs"
-      retries: 3
-      delay: 15
+    - name: Install Node.js and NPM
+      apt:
+        name: nodejs
+        state: present
 
     # --- 2. Key Generation & Stealth Parameters ---
     - name: Check if private key exists
