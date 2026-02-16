@@ -14,47 +14,49 @@
 
   tasks:
     # --- 1. System & Prerequisites ---
-    - name: Fix any broken dpkg installations
-      shell: "dpkg --configure -a"
-      ignore_errors: yes
-
-    - name: Clean up apt cache and broken installs
-      shell: |
-        apt-get clean
-        apt-get autoclean -y
-        apt-get autoremove -y
-      ignore_errors: yes
-
-    - name: Update apt cache and upgrade packages
+    - name: Update apt cache
       apt:
         update_cache: yes
-        upgrade: yes
+        cache_valid_time: 3600
+      ignore_errors: yes
+
+    - name: Install kernel headers (required for DKMS)
+      shell: "apt-get install -y --no-install-recommends linux-headers-generic"
       retries: 3
       delay: 10
+
+    - name: Remove broken amneziawg packages
+      shell: |
+        apt-get remove -y amneziawg amneziawg-dkms || true
+      ignore_errors: yes
+
+    - name: Clean DKMS state
+      shell: |
+        rm -rf /var/lib/dkms/amneziawg* || true
+      ignore_errors: yes
+
+    - name: Fix broken packages
+      shell: "apt-get install -f -y"
+      ignore_errors: yes
 
     - name: Add AmneziaWG PPA Repository
       shell: "add-apt-repository ppa:amnezia/ppa -y && apt update"
       args:
         creates: /etc/apt/sources.list.d/amnezia-ubuntu-ppa-jammy.list
-
-    - name: Clear package locks and attempt dpkg repair
-      shell: |
-        rm -f /var/lib/apt/lists/lock
-        rm -f /var/cache/apt/archives/lock
-        rm -f /var/lib/dpkg/lock*
-        dpkg --configure -a || true
-        apt-get install -f -y || true
       ignore_errors: yes
 
-    - name: Install core build tools first
+    - name: Install core build tools and utilities
       shell: "apt-get install -y --no-install-recommends curl build-essential python3-requests"
       retries: 3
-      delay: 15
+      delay: 10
 
-    - name: Install AmneziaWG
+    - name: Install AmneziaWG (now with headers available)
       shell: "apt-get install -y amneziawg"
       retries: 3
       delay: 15
+      register: awg_install
+      until: awg_install is succeeded
+      ignore_errors: yes
 
     # Note: Installing Node via apt is more stable for servers than NVM
     # This installs the latest 18.x or 20.x LTS from NodeSource to match "fresh" requirements
