@@ -62,12 +62,35 @@
       retries: 3
       delay: 10
 
+    - name: Remove old kernel entries from DKMS
+      shell: |
+        # Find and remove any DKMS entries for old kernels
+        for kernel in $(dkms status | grep amneziawg | grep -v "$(uname -r)" | awk '{print $3}' | cut -d',' -f1 | sort -u); do
+          dkms remove amneziawg/1.0.0 -k "$kernel" || true
+        done
+      ignore_errors: yes
+
+    - name: Clean up old kernel packages
+      shell: "apt-get autoremove -y"
+      ignore_errors: yes
+
+    - name: Wait for any dpkg locks to clear
+      shell: |
+        for i in {1..30}; do
+          if ! fuser /var/lib/dpkg/lock-frontend 2>/dev/null; then
+            exit 0
+          fi
+          sleep 1
+        done
+        echo "Timeout waiting for dpkg lock"
+        exit 1
+      ignore_errors: yes
+
     - name: Install AmneziaWG (with clean DKMS state)
       shell: "apt-get install -y amneziawg"
       retries: 3
       delay: 15
       register: awg_install
-      until: awg_install is succeeded
 
     # Note: Installing Node via apt is more stable for servers than NVM
     # This installs the latest 18.x or 20.x LTS from NodeSource to match "fresh" requirements
