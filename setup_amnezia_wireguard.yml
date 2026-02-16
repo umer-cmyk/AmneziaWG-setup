@@ -14,10 +14,23 @@
 
   tasks:
     # --- 1. System & Prerequisites ---
+    - name: Fix any broken dpkg installations
+      shell: "dpkg --configure -a"
+      ignore_errors: yes
+
+    - name: Clean up apt cache and broken installs
+      shell: |
+        apt-get clean
+        apt-get autoclean -y
+        apt-get autoremove -y
+      ignore_errors: yes
+
     - name: Update apt cache and upgrade packages
       apt:
         update_cache: yes
         upgrade: yes
+      retries: 3
+      delay: 10
 
     - name: Add AmneziaWG PPA Repository
       shell: "add-apt-repository ppa:amnezia/ppa -y && apt update"
