@@ -10,7 +10,8 @@ import json
 # ----------------------------
 API_BASE_URL = "https://papi.fusionsai.net/api"
 WG_INTERFACE = "awg0" 
-NETWORK_INTERFACE = "<interface>"
+# REPLACE <interface> with your actual interface (e.g., enp6s0 or eth0)
+NETWORK_INTERFACE = "<interface>" 
 SERVICE_NAME = f"awg-quick@{WG_INTERFACE}.service"
 PLATFORM = "android"
 HANDSHAKE_THRESHOLD = 180
@@ -32,23 +33,24 @@ except Exception as e:
 # HELPER FUNCTIONS
 # ----------------------------
 
-def get_network_throughput(interface, interval=1):
-    def get_bytes(iface):
+def get_download_speed(interface, interval=1):
+    """
+    Calculates only Download (RX) speed in Mbps.
+    """
+    def get_rx_bytes(iface):
         try:
-            rx = int(open(f'/sys/class/net/{iface}/statistics/rx_bytes').read())
-            tx = int(open(f'/sys/class/net/{iface}/statistics/tx_bytes').read())
-            return rx, tx
+            return int(open(f'/sys/class/net/{iface}/statistics/rx_bytes').read())
         except FileNotFoundError:
-            return 0, 0
+            return 0
 
-    rx1, tx1 = get_bytes(interface)
+    rx1 = get_rx_bytes(interface)
     time.sleep(interval)
-    rx2, tx2 = get_bytes(interface)
+    rx2 = get_rx_bytes(interface)
 
+    # Calculate Mbps: (Bytes * 8) / 1,000,000 / seconds
     download_mbps = round(((rx2 - rx1) * 8) / 1_000_000 / interval, 2)
-    upload_mbps = round(((tx2 - tx1) * 8) / 1_000_000 / interval, 2)
 
-    return download_mbps, upload_mbps
+    return download_mbps
 
 def get_vnstat_usage(interface):
     stats = {"daily": 0.0, "weekly": 0.0, "monthly": 0.0}
@@ -155,9 +157,9 @@ def send_data():
     vn_stats = get_vnstat_usage(NETWORK_INTERFACE)
     print(f"Historical Data -> Daily: {vn_stats['daily']} GB | Weekly: {vn_stats['weekly']} GB | Monthly: {vn_stats['monthly']} GB")
 
-    # 5. Bandwidth Speed
-    dl_mbps, ul_mbps = get_network_throughput(NETWORK_INTERFACE)
-    print(f"Current Speed: {dl_mbps} Mbps DL / {ul_mbps} Mbps UL")
+    # 5. Bandwidth Speed (Download Only)
+    dl_mbps = get_download_speed(NETWORK_INTERFACE)
+    print(f"Current Speed: {dl_mbps} Mbps (Download)")
 
     print("-" * 60) # Separator
 
@@ -187,15 +189,15 @@ def send_data():
     except Exception as e:
         print(f"[ERROR] Status API: {e}")
 
-    # Send Speed
+    # Send Speed (UPDATED ENDPOINT - Download Only)
     try:
-        url = f"{API_BASE_URL}/bandwidth/amnezia/{ipAddress}/{dl_mbps}/{ul_mbps}"
+        url = f"{API_BASE_URL}/server-speed/amnezia/{ipAddress}/{dl_mbps}"
         resp = requests.post(url, timeout=10)
         print(f"[INFO] Speed   → {resp.url} | Status: {resp.status_code}")
     except Exception as e:
         print(f"[ERROR] Bandwidth API: {e}")
 
-    # Send History (Updated to Path Parameters)
+    # Send History
     try:
         # Format: /historical-bandwidth/amnezia/{IP}/{Daily}/{Weekly}/{Monthly}
         url = f"{API_BASE_URL}/historical-bandwidth/amnezia/{ipAddress}/{vn_stats['daily']}/{vn_stats['weekly']}/{vn_stats['monthly']}"

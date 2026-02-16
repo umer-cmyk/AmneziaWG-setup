@@ -30,6 +30,7 @@
           - amneziawg
           - curl
           - build-essential
+          - python3-requests
         state: present
 
     # Note: Installing Node via apt is more stable for servers than NVM
@@ -180,7 +181,7 @@
         dest: "{{ scripts_dir }}/{{ item }}"
         mode: '0755'
       loop:
-        - next_available_ip.sh
+        - next_available_ip.py
         - add_peer.sh
         - cleanup_inactive.sh
         - awg_stats_to_api.py

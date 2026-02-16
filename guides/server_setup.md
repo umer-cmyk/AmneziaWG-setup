@@ -126,10 +126,10 @@ sudo chmod +x /etc/amnezia/amneziawg/scripts/*.py
 ```
 
 Recommended scripts (provided in this repository):
-- `next_available_ip.sh` — finds the next available IP in the 10.100.x.x space
+- `next_available_ip.py` — finds the next available IP in the 10.100.x.x space
 - `add_peer.sh` — adds a peer or returns an existing assignment
 - `cleanup_inactive.sh` — removes stale peers
-- `wg_stats_to_api.py` — sends server stats to the API endpoint
+- `awg_stats_to_api.py` — sends server stats to the API endpoint
 
 Schedule the cleanup script every 5 minutes and the stats script every 3 minutes using cron. Edit the root crontab (`sudo crontab -e`) and add:
 

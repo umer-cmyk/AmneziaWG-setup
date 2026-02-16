@@ -2,7 +2,7 @@
 
 # Configuration
 INTERFACE="awg0"
-IP_SCRIPT="/etc/amnezia/amneziawg/scripts/next_available_ip.sh" 
+IP_SCRIPT="/etc/amnezia/amneziawg/scripts/next_available_ip.py" 
 
 # 2. Check argument
 if [ -z "$1" ]; then
