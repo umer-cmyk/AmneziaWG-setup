@@ -1,0 +1,19 @@
+---
+- name: Update UFW Firewall Rules on Deployed AmneziaWG Servers
+  hosts: deployed_Awireguard_servers
+  become: true
+
+  tasks:
+    - name: Remove SSH access from all sources (delete port 22/tcp allow rule)
+      ufw:
+        rule: allow
+        port: "22"
+        proto: tcp
+        state: absent
+
+    - name: Allow all traffic from specific VPN server IP
+      ufw:
+        rule: allow
+        from_ip: 38.180.244.244
+        comment: "VPN server IP"
+        state: present
