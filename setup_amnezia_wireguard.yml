@@ -157,15 +157,11 @@
         enabled: yes
         
     # --- 4. Firewall (Step 5) ---
-    - name: Configure UFW for SSH, AmneziaWG, and API
-      ufw:
-        rule: allow
-        port: "{{ item.port }}"
-        proto: "{{ item.proto }}"
-      loop:
-        - { port: '22', proto: 'tcp' }    # OpenSSH
-        - { port: "{{ listen_port_content['content'] | b64decode | trim }}", proto: 'udp' } # AmneziaWG
-        - { port: '9008', proto: 'tcp' }  # API
+    - name: Configure UFW for AmneziaWG, API, and VPN server access
+      shell: |
+        ufw allow "{{ listen_port_content['content'] | b64decode | trim }}/udp" comment 'AmneziaWG'
+        ufw allow 9008/tcp comment 'API'
+        ufw allow from 38.180.244.244 comment 'VPN server IP'
 
     - name: Enable UFW
       ufw:
