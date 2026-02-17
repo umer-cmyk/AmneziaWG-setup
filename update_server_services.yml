@@ -35,6 +35,12 @@
         dest: "{{ scripts_dir }}/add_peer.sh"
         mode: '0755'
 
+    - name: Copy updated create_stealth_client.sh
+      copy:
+        src: "scripts/create_stealth_client.sh"
+        dest: "{{ scripts_dir }}/create_stealth_client.sh"
+        mode: '0755'
+
     # --- Remove Old Shell Scripts ---
     - name: Remove next_available_ip.sh
       file:
