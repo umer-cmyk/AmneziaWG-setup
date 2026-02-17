@@ -1,6 +1,6 @@
 ---
 - name: Update AmneziaWG Server Services
-  hosts: deployed_Awireguard_servers
+  hosts: servers_to_update
   become: true
   vars:
     # Paths from main setup playbook
