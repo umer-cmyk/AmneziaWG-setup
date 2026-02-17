@@ -7,6 +7,17 @@
     scripts_dir: "/etc/amnezia/amneziawg/scripts"
 
   tasks:
+    - name: Install vnstat for network monitoring
+      apt:
+        name: vnstat
+        state: present
+
+    - name: Enable and start vnstat service
+      systemd:
+        name: vnstat
+        enabled: yes
+        state: started
+
     - name: Copy updated awg_stats_to_api.py
       copy:
         src: "scripts/awg_stats_to_api.py"
