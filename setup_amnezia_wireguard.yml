@@ -195,6 +195,12 @@
         - awg_stats_to_api.py
         - create_stealth_client.sh
 
+    - name: Configure Network Interface in awg_stats_to_api.py
+      replace:
+        path: "{{ scripts_dir }}/awg_stats_to_api.py"
+        regexp: 'NETWORK_INTERFACE = "<interface>"'
+        replace: 'NETWORK_INTERFACE = "{{ ansible_default_ipv4.interface }}"'
+
     - name: Setup Cron Job for Cleanup (every 5 minutes)
       cron:
         name: "Cleanup Inactive AmneziaWG Peers"

@@ -136,6 +136,24 @@ sudo chmod +x /etc/amnezia/amneziawg/scripts/*.sh
 sudo chmod +x /etc/amnezia/amneziawg/scripts/*.py
 ```
 
+### 7.1 Configure Network Interface for Stats Script
+
+The `awg_stats_to_api.py` script needs to know your actual network interface for bandwidth monitoring. First, check your interface name:
+
+```bash
+ip link
+# or
+ifconfig
+```
+
+Common interface names: `eth0`, `enp0s3`, `enp6s0`, etc. Then replace the placeholder:
+
+```bash
+sudo sed -i 's/NETWORK_INTERFACE = "<interface>"/NETWORK_INTERFACE = "YOUR_INTERFACE_NAME"/g' /etc/amnezia/amneziawg/scripts/awg_stats_to_api.py
+```
+
+Replace `YOUR_INTERFACE_NAME` with your actual interface (e.g., `eth0` or `enp6s0`).
+
 Recommended scripts (provided in this repository):
 - `next_available_ip.py` — finds the next available IP in the 10.100.x.x space
 - `add_peer.sh` — adds a peer or returns an existing assignment
