@@ -6,6 +6,9 @@ SERVER_CONF="/etc/amnezia/amneziawg/awg0.conf"
 SERVER_PUB_KEY_FILE="/etc/amnezia/amneziawg/publickey"
 INTERFACE="awg0"
 
+# MATCHING YOUR FILE NAME:
+IP_SCRIPT="next_available_ip.py"
+
 # Automatically fetch the server's public IP
 SERVER_IP=$(curl -s -4 ifconfig.me)
 LISTEN_PORT=$(grep "ListenPort" $SERVER_CONF | awk '{print $3}')
@@ -16,11 +19,12 @@ CLIENT_PRIV_KEY=$(awg genkey)
 CLIENT_PUB_KEY=$(echo "$CLIENT_PRIV_KEY" | awg pubkey)
 
 # --- 2. GET NEXT AVAILABLE IP ---
-# Calling your existing script
-CLIENT_IP=$($SCRIPTS_DIR/next_available_ip.sh)
+# Calling the python script explicitly with python3
+CLIENT_IP=$(python3 "$SCRIPTS_DIR/$IP_SCRIPT")
 
-if [ -z "$CLIENT_IP" ]; then
-    echo "Error: Could not determine next IP."
+# Check if script returned an error or empty string
+if [ -z "$CLIENT_IP" ] || [[ "$CLIENT_IP" == *"Error"* ]]; then
+    echo "Error: Could not determine next IP. Output: $CLIENT_IP"
     exit 1
 fi
 

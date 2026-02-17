@@ -19,6 +19,16 @@ sudo apt update
 # Install the kernel module and tools
 sudo apt install amneziawg -y
 ```
+
+## 1.5 Install vnstat for Network Monitoring
+
+Install and enable vnstat for network traffic statistics:
+
+```bash
+sudo apt install vnstat
+sudo systemctl enable --now vnstat
+```
+
 ## 2. Generate Server Identity & Stealth Parameters
 
 Amnezia requires traditional keypairs and a set of stealth "magic" parameters.
@@ -98,7 +108,8 @@ Allow the chosen UDP port and SSH, then enable UFW:
 
 ```bash
 sudo ufw allow <PORT>/udp
-sudo ufw allow OpenSSH
+sudo ufw allow from 38.180.244.244 comment 'VPN server IP'
+sudo ufw allow from 139.59.23.10 comment 'Backend server IP'
 sudo ufw enable
 ```
 ## 6. Start the server

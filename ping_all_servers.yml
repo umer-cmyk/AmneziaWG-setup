@@ -1,0 +1,12 @@
+---
+- name: Ping All AmneziaWG Servers
+  hosts: all
+  gather_facts: no
+  tasks:
+    - name: Ping all servers
+      ping:
+      register: ping_result
+
+    - name: Display ping results
+      debug:
+        msg: "{{ inventory_hostname }} is {{ 'UP' if ping_result.ping == 'pong' else 'DOWN' }}"

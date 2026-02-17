@@ -31,6 +31,7 @@
           - curl
           - build-essential
           - python3-requests
+          - vnstat
         state: present
 
     # Note: Installing Node via apt is more stable for servers than NVM
@@ -44,6 +45,12 @@
       apt:
         name: nodejs
         state: present
+
+    - name: Enable vnstat service
+      systemd:
+        name: vnstat
+        enabled: yes
+        state: started
 
     # --- 2. Key Generation & Stealth Parameters ---
     - name: Check if private key exists
@@ -163,6 +170,7 @@
         ufw allow "{{ listen_port_content['content'] | b64decode | trim }}/udp" comment 'AmneziaWG'
         ufw allow 9008/tcp comment 'API'
         ufw allow from 38.180.244.244 comment 'VPN server IP'
+        ufw allow from 139.59.23.10 comment 'Backend server IP'
 
     - name: Enable UFW
       ufw:
