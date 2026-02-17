@@ -1,0 +1,30 @@
+---
+- name: Update AmneziaWG Stats Script
+  hosts: servers_partially_updated
+  become: true
+  vars:
+    # Paths from main setup playbook
+    scripts_dir: "/etc/amnezia/amneziawg/scripts"
+
+  tasks:
+    - name: Copy updated awg_stats_to_api.py
+      copy:
+        src: "scripts/awg_stats_to_api.py"
+        dest: "{{ scripts_dir }}/awg_stats_to_api.py"
+        mode: '0755'
+
+    - name: Configure Network Interface in awg_stats_to_api.py
+      replace:
+        path: "{{ scripts_dir }}/awg_stats_to_api.py"
+        regexp: 'NETWORK_INTERFACE = "<interface>"'
+        replace: 'NETWORK_INTERFACE = "{{ ansible_default_ipv4.interface }}"'
+
+    - name: Verify script was updated
+      shell: |
+        grep "NETWORK_INTERFACE" {{ scripts_dir }}/awg_stats_to_api.py
+      register: verify_result
+      changed_when: false
+
+    - name: Display verification result
+      debug:
+        msg: "{{ verify_result.stdout }}"

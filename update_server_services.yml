@@ -35,6 +35,12 @@
         dest: "{{ scripts_dir }}/add_peer.sh"
         mode: '0755'
 
+    # --- Remove Old Shell Scripts ---
+    - name: Remove next_available_ip.sh
+      file:
+        path: "{{ scripts_dir }}/next_available_ip.sh"
+        state: absent
+
     - name: Verify services are running
       shell: |
         pm2 status
